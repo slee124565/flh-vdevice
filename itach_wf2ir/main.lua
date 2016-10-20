@@ -9,24 +9,14 @@
 --]]
 
 -- device constant delcare
-DEVICE_TEXT = '小辦公室冷氣遙控'
 
-DEVICE_MODE_COOL = '冷氣'
-DEVICE_MODE_HUMID = '除濕'
-DEVICE_MODE_WIND = '送風'
-
-DEVICE_CMD_ON = 'turn_on'
-DEVICE_CMD_OFF = 'turn_off'
-
-DEVICE_BTN_ID_ON = 2
-DEVICE_BTN_ID_OFF = 3
-DEVICE_BTN_ID_CTRL = 4
+DEVICE_SOCKET_BTN_ID = 24               -- TODO: script auto config
 
 -- system constant declare
 
-G_VAR_NAME_META = 'gWF2IR_n_Meta'
-G_VAR_NAME_BUSY = 'gWF2IR_n_Isbusy'
-G_VAR_NAME_CMD = 'gWF2IR_n_Cmd'
+G_VAR_NAME_META = 'gWF2IR_8_Meta'      -- TODO: script auto check and create
+G_VAR_NAME_BUSY = 'gWF2IR_8_Isbusy'    -- TODO: script auto check and create
+G_VAR_NAME_CMD = 'gWF2IR_8_Cmd'        -- TODO: script auto check and create
 
 
 _DEBUG = 10
@@ -75,17 +65,12 @@ local isBusy = fibaro:getGlobalValue( G_VAR_NAME_BUSY ) == "true"
 if not isBusy then
     local cmds = fibaro:getGlobal( G_VAR_NAME_CMD )
     if cmds ~= "" then
-        mIdleTime = time
-        if cmds:match( DEVICE_CMD_ON ) ~= null then
-            Trace( 'get cmd ' .. cmds , _INFO )
-            fibaro:call( mSelfId , "pressButton" , DEVICE_BTN_ID_CTRL )
-        elseif cmds:match( DEVICE_CMD_OFF ) ~= null then
-            Trace( 'get cmd ' .. cmds , _INFO )
-            fibaro:call( mSelfId , "pressButton" , DEVICE_BTN_ID_CTRL )
-        else
-            Trace( 'get unknown cmd ' .. cmds , _WARNING )
-        end
+        --mIdleTime = time
+        Trace('get cmds : ' .. tostring(cmds))
+        fibaro:call( mSelfId , "pressButton" , DEVICE_SOCKET_BTN_ID )
     else
-        Trace( '[no cmd]' , _DEBUG )
+        Trace( 'no cmd idle' , _DEBUG )
     end
+else
+    Trace('busy skip')
 end

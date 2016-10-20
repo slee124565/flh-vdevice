@@ -1,7 +1,33 @@
--- system constant declare
-G_VAR_NAME_META = 'gWF2IR_n_Meta'
-G_VAR_NAME_BUSY = 'gWF2IR_n_Isbusy'
-G_VAR_NAME_CMD = 'gWF2IR_n_Cmd'
+-- device constant declare
+DEVICE_CMDS = {
+    'POWER_ON',
+    'POWER_OFF',
+    'VOL_UP',
+    'VOL_DOWN',
+    'CH_UP',
+    'CH_DOWN',
+    'SELECT_INPUT',
+}
+
+ITACH_PORT = '1:3'
+IRCODE_POWER_ON = 'sendir,' .. ITACH_PORT .. ',1,40192,1,1,96,24,24,24,48,24,48,24,48,24,24,24,48,24,24,24,48,24,24,24,24,24,24,24,24,1012,96,24,24,24,48,24,48,24,48,24,24,24,48,24,24,24,48,24,24,24,24,24,24,24,24,1012,96,24,24,24,48,24,48,24,48,24,24,24,48,24,24,24,48,24,24,24,24,24,24,24,24,3144' .. '\r'
+IRCODE_POWER_OFF = 'sendir,' .. ITACH_PORT .. ',1,40064,1,1,96,24,48,24,48,24,48,24,48,24,24,24,48,24,24,24,48,24,24,24,24,24,24,24,24,985,96,24,48,24,48,24,48,24,48,24,24,24,48,24,24,24,48,24,24,24,24,24,24,24,24,985,96,24,48,24,48,24,48,24,48,24,24,24,48,24,24,24,48,24,24,24,24,24,24,24,24,3128' .. '\r'
+IRCODE_VOL_UP = 'sendir,' .. ITACH_PORT .. ',1,40192,1,1,96,24,24,24,48,24,24,24,24,24,48,24,24,24,24,24,48,24,24,24,24,24,24,24,24,1060,96,24,24,24,48,24,24,24,24,24,48,24,24,24,24,24,48,24,24,24,24,24,24,24,24,1060,96,24,24,24,48,24,24,24,24,24,48,24,24,24,24,24,48,24,24,24,24,24,24,24,24,5144' .. '\r'
+IRCODE_VOL_DOWN = 'sendir,' .. ITACH_PORT .. ',1,40322,1,1,96,24,48,24,48,24,24,24,24,24,48,24,24,24,24,24,48,24,24,24,24,24,24,24,24,1039,96,24,48,24,48,24,24,24,24,24,48,24,24,24,24,24,48,24,24,24,24,24,24,24,24,1039,96,24,48,24,48,24,24,24,24,24,48,24,24,24,24,24,48,24,24,24,24,24,24,24,24,5161' .. '\r'
+IRCODE_CH_UP = 'sendir,' .. ITACH_PORT .. ',1,40322,1,1,96,24,24,24,24,24,24,24,24,24,48,24,24,24,24,24,48,24,24,24,24,24,24,24,24,1088,96,24,24,24,24,24,24,24,24,24,48,24,24,24,24,24,48,24,24,24,24,24,24,24,24,1087,96,24,24,24,24,24,24,24,24,24,48,24,24,24,24,24,48,24,24,24,24,24,24,24,24,5161' .. '\r'
+IRCODE_CH_DOWN = 'sendir,' .. ITACH_PORT .. ',1,40192,1,1,96,24,48,24,24,24,24,24,24,24,48,24,24,24,24,24,48,24,24,24,24,24,24,24,24,1060,96,24,48,24,24,24,24,24,24,24,48,24,24,24,24,24,48,24,24,24,24,24,24,24,24,1060,96,24,48,24,24,24,24,24,24,24,48,24,24,24,24,24,48,24,24,24,24,24,24,24,24,5144' .. '\r'
+IRCODE_SELECT_INPUT = 'sendir,' .. ITACH_PORT .. ',1,40192,1,1,96,24,48,24,24,24,48,24,24,24,24,24,48,24,24,24,48,24,24,24,24,24,24,24,24,1036,96,24,48,24,24,24,48,24,24,24,24,24,48,24,24,24,48,24,24,24,24,24,24,24,24,1036,96,24,48,24,24,24,48,24,24,24,24,24,48,24,24,24,48,24,24,24,24,24,24,24,24,5144' .. '\r'
+
+DEVICE_STR_BUSY = 'BUSY...WAIT...'
+DEVICE_STR_ON = 'ON'
+DEVICE_STR_OFF = 'OFF'
+DEVICE_STR_CMD_ERR = 'ERROR'
+
+G_VAR_NAME_META = 'gWF2IR_8_Meta'
+G_VAR_NAME_BUSY = 'gWF2IR_8_Isbusy'
+G_VAR_NAME_CMD = 'gWF2IR_8_Cmd'
+
+-- device constant declare end
 
 -- debug function declare
 _DEBUG = 10
@@ -24,41 +50,125 @@ function Trace( _text , _weight )
     end
 end
 
-Trace('Control Button Pressed', _DEBUG)
+Trace('service enter', _DEBUG)
+
+-- variable initial
+local selfID = fibaro:getSelfId()
+local ipAddress = fibaro:getValue( selfID , "IPAddress" )
+local tcpPort = fibaro:getValue( selfID , "TCPPort" )
+Trace('Socket Server IP: ' .. ipAddress .. ' listen port: ' .. tcpPort)
+
+-- socket function implement
+function sendIrSocketData( _irCode )
+
+    local socket
+    local status , err = pcall(
+        function() 
+            socket = Net.FTcpSocket( ipAddress , tcpPort )
+            socket:setReadTimeout( 3000 )
+        end )  
+    if status ~= nil and status ~= true then
+        Trace( "socket status: " .. tostring( status or "" ) )
+    end  
+    if err ~= nil then
+        Trace( "socket err: " .. tostring( err or "" ), _ERROR )
+    else
+        local bytes , errCode = socket:write( _irCode )
+        if errCode == 0 then
+            local rdata , errCode = socket:read()
+            Trace( 'socket read result code ' .. tostring(errCode) .. ' data: ' .. tostring(rdata) )
+            rdata = tostring(rdata)
+            Trace( 'completeir index ' .. tostring(rdata.find('completeir')))
+            if rdata.find('completeir') == 0 then
+                cmdResult = true
+            else
+                cmdResult = false
+                Trace('socket data check fail', _ERROR)
+            end
+        else
+            Trace( 'socket write err code ' .. tostring(errCode) )
+
+        end
+        -- socket disconnect
+        socket:disconnect()
+        socket = nil
+        return (errCode == 0) and cmdResult    
+    end
+    return false
+end
+
+function sendIrSocketDataWithRetry( _irCode )
+    local MAX_COUNT = 3
+    local _count = 0
+    while _count <= MAX_COUNT do
+        if not sendIrSocketData(_irCode) then
+            _count = _count + 1
+            Trace('sendIrSocketDataWithRetry retry ' .. _count)
+        else
+            break
+        end
+    end
+end
+
+-- doCmdxxx function declare
+function doCmdOn()
+    sendIrSocketDataWithRetry(DEVICE_CMD_ON_IRCODE)
+end    
+function doCmdOff()
+    sendIrSocketDataWithRetry(DEVICE_CMD_OFF_IRCODE)
+end    
 
 -- doCmds function
 function doCmd( _cmd )
-    Trace( 'TODO: implement command ' .. tostring(_cmd) )
-    return true
+    Trace( 'execute cmd: ' .. tostring(_cmd) .. ' ...', _INFO)
+    fibaro:call( selfID , "setProperty" , "ui.state.value" , DEVICE_STR_BUSY )
+    local state = DEVICE_STR_CMD_ERR
+    if _cmd == DEVICE_CMD_ON then
+        if doCmdOn() then
+            state = DEVICE_STR_ON
+            Trace('set state ' .. state)
+        end
+    elseif _cmd == DEVICE_CMD_OFF then
+        if doCmdOff() then
+            state = DEVICE_STR_OFF
+            Trace('set state ' .. state)
+        end
+    else
+        Trace( 'unknown cmd ' .. tostring(_cmd), _ERROR )
+    end
+    Trace('final state ' .. state)
+    fibaro:call( selfID , "setProperty" , "ui.state.value" , state )
+    Trace( 'execute cmd finished', _INFO)
 end
 
--- main function
+-- device daemon loop
 local isBusy = fibaro:getGlobalValue( G_VAR_NAME_BUSY ) == "true"
 if isBusy then
-    Trace( "device is busy", _WARNING )
+    Trace( "busy skip", _WARNING )
+    fibaro:call( selfID , "setProperty" , "ui.state.value" , DEVICE_S_BUSY )
 else
     -- set busy token
+    Trace( 'set busy token')
     fibaro:setGlobal( G_VAR_NAME_BUSY , "true" )
     
     -- read cmd
     local cmds = fibaro:getGlobal( G_VAR_NAME_CMD )
     
     if cmds == '' then
-        Trace('[no cmds]')
+        Trace('gets no cmds', _INFO)
     else
-        Trace('ctrl cmds: ' .. cmds)
+        Trace('get cmds: ' .. cmds, _INFO)
         cmds = string.gmatch(cmds,'%S+')
 
         for tCmd in cmds do
-            if doCmd(tCmd) then
-                Trace('cmd ' .. tCmd .. ' finished', _INFO)
-            else
-                Trace('cmd ' .. tCmd .. ' fail', _ERROR)
-            end
+            doCmd(tCmd)
+            fibaro:sleep(500)
         end
 
         fibaro:setGlobal( G_VAR_NAME_CMD , '' )
+        Trace('reset cmd queue')
     end
     
+    Trace('release busy token')
     fibaro:setGlobal( G_VAR_NAME_BUSY , 'false' )
 end
