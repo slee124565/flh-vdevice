@@ -1,4 +1,16 @@
+--[[
+%% properties
+%% events
+%% globals
+--]]
+
+
 -- device constant declare
+
+--BUTTON_CMD = 'VOL_UP'
+
+VDEV_ID = 8
+
 ITACH_PORT = '1:3'
 
 IRCODE_POWER_ON = 'sendir,' .. ITACH_PORT .. ',1,40192,1,1,96,24,24,24,48,24,48,24,48,24,24,24,48,24,24,24,48,24,24,24,24,24,24,24,24,1012,96,24,24,24,48,24,48,24,48,24,24,24,48,24,24,24,48,24,24,24,24,24,24,24,24,1012,96,24,24,24,48,24,48,24,48,24,24,24,48,24,24,24,48,24,24,24,24,24,24,24,24,3144' .. '\r'
@@ -51,10 +63,11 @@ function Trace( _text , _weight )
     end
 end
 
+Trace('service enter', _DEBUG)
+
 -- variable initial
-local selfID = fibaro:getSelfId()
-local ipAddress = fibaro:getValue( selfID , "IPAddress" )
-local tcpPort = fibaro:getValue( selfID , "TCPPort" )
+local ipAddress = fibaro:getValue( VDEV_ID , "IPAddress" )
+local tcpPort = fibaro:getValue( VDEV_ID , "TCPPort" )
 Trace('Socket Server IP: ' .. ipAddress .. ' listen port: ' .. tcpPort)
 
 -- socket function implement
@@ -110,43 +123,13 @@ function sendIrSocketDataWithRetry( _irCode )
 end
 
 -- doCmds function
-function doCmd( _cmd )
-    Trace( 'execute cmd: ' .. tostring(_cmd) .. ' ...', _INFO)
-    fibaro:call( selfID , "setProperty" , "ui.state.value" , DEVICE_STR_BUSY )
-    local state = 'SendIr CMD ' .. _cmd
-    sendIrSocketDataWithRetry(IR_DEVICE_CMDCODES[_cmd])
-    fibaro:call( selfID , "setProperty" , "ui.state.value" , state )
+button_cmd = fibaro:getGlobal( G_VAR_NAME_CMD )
+if (button_cmd ~= '') then
+    fibaro:setGlobal( G_VAR_NAME_CMD, '')
+    Trace( 'execute cmd: ' .. tostring(button_cmd) .. ' ...', _INFO)
+    local state = 'SendIr CMD ' .. button_cmd
+    sendIrSocketDataWithRetry(IR_DEVICE_CMDCODES[button_cmd])
     Trace( 'execute cmd finished', _INFO)
-end
-
--- device daemon loop
-local isBusy = fibaro:getGlobalValue( G_VAR_NAME_BUSY ) == "true"
-if isBusy then
-    Trace( "busy skip", _WARNING )
-    fibaro:call( selfID , "setProperty" , "ui.state.value" , DEVICE_S_BUSY )
 else
-    -- set busy token
-    Trace( 'set busy token')
-    fibaro:setGlobal( G_VAR_NAME_BUSY , "true" )
-    
-    -- read cmd
-    local cmds = fibaro:getGlobal( G_VAR_NAME_CMD )
-    
-    if cmds == '' then
-        Trace('gets no cmds', _INFO)
-    else
-        Trace('get cmds: ' .. cmds, _INFO)
-        cmds = string.gmatch(cmds,'%S+')
-
-        for tCmd in cmds do
-            doCmd(tCmd)
-            fibaro:sleep(500)
-        end
-
-        fibaro:setGlobal( G_VAR_NAME_CMD , '' )
-        Trace('reset cmd queue')
-    end
-    
-    Trace('release busy token')
-    fibaro:setGlobal( G_VAR_NAME_BUSY , 'false' )
+    Trace( 'no cmd to execute!', _WARNING)
 end

@@ -1,13 +1,10 @@
 -- device constant declare
-DEVICE_CMD_ON = 'turn_on'
-DEVICE_CMD_OFF = 'turn_off'
-
-DEVICE_BUSY_STRING = 'BUSY...WAIT...'
+BUTTON_CMD = 'POWER_ON'
 
 -- system constant declare
-G_VAR_NAME_META = 'gWF2IR_n_Meta'
-G_VAR_NAME_BUSY = 'gWF2IR_n_Isbusy'
-G_VAR_NAME_CMD = 'gWF2IR_n_Cmd'
+G_VAR_NAME_META = 'gWF2IR_8_Meta'
+G_VAR_NAME_BUSY = 'gWF2IR_8_Isbusy'
+G_VAR_NAME_CMD = 'gWF2IR_8_Cmd'
 
 _DEBUG = 10
 _INFO = 20
@@ -37,6 +34,6 @@ if isBusy then
     Trace('device is busy', _WARNING)
     fibaro:call( selfID , "setProperty" , "ui.state.value" , DEVICE_BUSY_STRING )
 else
-    local cmd = fibaro:getGlobal( G_VAR_NAME_CMD ) .. " " .. DEVICE_CMD_ON
+    local cmd = fibaro:getGlobal( G_VAR_NAME_CMD ) .. " " .. BUTTON_CMD
     fibaro:setGlobal( G_VAR_NAME_CMD , cmd )
 end
