@@ -6,9 +6,21 @@
         gLu_D_Stop: true (stop daemon) or false (start daemon)
 --]]
 
--- device constant
-ACCOUNT = 'fibaro'
-PASSWORD = 'fibaro'
+-- lutron integration ID
+DEV_INTEG_ID = 11                   
+
+-- component number
+COMPONENT_NUM_BTN_1 = 1             
+COMPONENT_NUM_BTN_2 = 2             
+COMPONENT_NUM_BTN_3 = 3             
+COMPONENT_NUM_BTN_4 = 4             
+COMPONENT_NUM_BTN_5 = 5             
+COMPONENT_NUM_BTN_18 = 18           
+COMPONENT_NUM_BTN_19 = 19           
+
+-- vdev config
+btnCmd = '#device,' .. DEV_INTEG_ID .. ',' .. COMPONENT_NUM_BTN_18 .. ',3'
+btnCmdDescription = 'button up press'
 
 -- global variable in used
 G_VAR_NAME_META = 'gLu_D_Meta'
@@ -21,7 +33,7 @@ _DEBUG = 10
 _INFO = 20
 _WARNING = 30
 _ERROR = 40
-logLevel = _INFO 
+logLevel = _INFO
 
 function Trace( _text , _weight )
     _weight = _weight or _DEBUG
@@ -37,7 +49,7 @@ function Trace( _text , _weight )
     end
 end
 
-Trace('lutron daemon exit', _DEBUG)
+Trace(btnCmdDescription, _INFO)
 
 -- variable initial
 local selfID = fibaro:getSelfId()
@@ -45,12 +57,13 @@ local ipAddress = fibaro:getValue( selfID , "IPAddress" )
 local tcpPort = fibaro:getValue( selfID , "TCPPort" )
 Trace('Socket Server IP: ' .. ipAddress .. ' listen port: ' .. tcpPort)
 
-fibaro:setGlobal(G_VAR_NAME_META, '')
-fibaro:setGlobal(G_VAR_NAME_STATE, '')
-fibaro:setGlobal(G_VAR_NAME_CMD, '')
-fibaro:setGlobal(G_VAR_NAME_STOP, 'true')
-
-fibaro:call( selfID , "setProperty" , "ui.status.value" , '' )
-fibaro:call( selfID , "setProperty" , "ui.lastcmd.value" , '' )
-fibaro:call( selfID , "setProperty" , "ui.stopflag.value" , '' )
-fibaro:call( selfID , "setProperty" , "ui.err.value" , '' )
+local wait_cmd = fibaro:getGlobal(G_VAR_NAME_CMD)
+-- check if cmd wait
+if wait_cmd ~= '' and wait_cmd ~= nil then
+    Trace('wait command exist: ' .. wait_cmd, _WARNING)
+    fibaro:log('busy, try later')
+else
+    fibaro:setGlobal(G_VAR_NAME_CMD,btnCmd)
+    Trace('set cmd: ' .. btnCmd)
+    fibaro:log(btnCmdDescription)
+end

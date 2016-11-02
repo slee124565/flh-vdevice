@@ -15,6 +15,7 @@ G_VAR_NAME_META = 'gLu_D_Meta'
 G_VAR_NAME_STATE = 'gLu_D_State'
 G_VAR_NAME_CMD = 'gLu_D_Cmd'
 G_VAR_NAME_STOP = 'gLu_D_Stop'
+G_VAR_NAME_WD_STOP = 'gLu_WD_Stop'     -- Watch Dog Stop Flag 
 
 -- debug function declare
 _DEBUG = 10
@@ -68,7 +69,7 @@ fibaro:call( selfID , "setProperty" , "ui.err.value" , '' )
 function lutron_data_handler(_data)
     Trace('_data: ' .. _data)
     fibaro:call( selfID , "setProperty" , "ui.status.value" , 'receiving data' )
-    local last_cmd
+    local last_data
     local meta = fibaro:getGlobal(G_VAR_NAME_META)
     Trace('meta: ' .. tostring(meta) .. ',type: ' .. type(meta))
     if meta == nil or meta == '' then
@@ -78,6 +79,7 @@ function lutron_data_handler(_data)
     else
     	meta = json.decode(meta)
     end
+    local devDataFlag = false
     for entry in string.gmatch(_data .. '\r\n','~(.-)%\r%\n') do
         Trace('match cmd: ' .. entry)
         local devType = string.match(entry,'(.-),')
@@ -90,23 +92,20 @@ function lutron_data_handler(_data)
             if pre_state ~= entry then
                 logType = _INFO
             end
-            Trace('devID ' .. devID .. ', pre_state ' .. pre_state .. ', new_state ' .. entry, logType)
+            Trace('devID ' .. tostring(devID) .. ', pre_state ' .. tostring(pre_state) .. ', new_state ' .. tostring(entry), logType)
         else
             Trace('unknow devType ' .. devType, _WARNING)
         end
-        last_cmd = entry
+        last_data = entry
+        devDataFlag = true
     end
-    fibaro:setGlobal(G_VAR_NAME_META,json.encode(meta))
-    --fibaro:call( selfID , "setProperty" , "ui.lastcmd.value" , tostring(last_cmd) )
-    fibaro:log(tostring(last_cmd))
-    meta = fibaro:getGlobal(G_VAR_NAME_META)
-    Trace('updated meta: ' .. meta, _INFO)
+    if devDataFlag then
+        fibaro:setGlobal(G_VAR_NAME_META,json.encode(meta))
+        meta = fibaro:getGlobal(G_VAR_NAME_META)
+        Trace('updated meta: ' .. meta, _INFO)
+    end
+    fibaro:log(tostring(last_data))
     
-end
-
-function cmd_handler(_cmd)
-    fibaro:call( selfID , "setProperty" , "ui.status.value" , 'execute cmd' )
-    Trace('TODO: cmd_handler ' .. tostring(_cmd), _WARNING)
 end
 
 function service_run()
@@ -160,14 +159,19 @@ function service_run()
                         if rdata ~= '' and errCode ~= SCK_READ_TIMEOUT_ERR_CODE then
                             lutron_data_handler(rdata)
                         else
-                            fibaro:sleep(1000)
-                        end
-                        cmd = fibaro:getGlobal('G_VAR_NAME_CMD')
-                        Trace('check cmd queue: ' .. tostring(cmd))
-                        if cmd ~= '' and cmd ~= nil then
-                            fibaro:setGlobal('G_VAR_NAME_CMD', '')
-                            Trace('clear cmd queue and handle cmd')
-                            cmd_handler(cmd)
+                            cmd = fibaro:getGlobal(G_VAR_NAME_CMD)
+                            Trace('check cmd queue: ' .. tostring(cmd))
+                            if cmd ~= '' and cmd ~= nil then
+                                fibaro:call( selfID , "setProperty" , "ui.status.value" , 'execute cmd' )
+                                fibaro:setGlobal(G_VAR_NAME_CMD, '')
+                                Trace('clear cmd queue and handle cmd')
+                                Trace('process cmd: ' .. cmd, _INFO)
+                                bytes, errCode = socket:write(cmd .. '\r\n')
+                                Trace( 'socket write result code ' .. tostring(errCode) .. ' bytes: ' .. tostring(bytes) )
+                                fibaro:call( selfID , "setProperty" , "ui.lastcmd.value" , cmd )
+                            else
+                                fibaro:sleep(500)
+                            end
                         end
                         stopflag = fibaro:getGlobal(G_VAR_NAME_STOP)
                         Trace('check stop flag ' .. tostring(stopflag))

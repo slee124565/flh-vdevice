@@ -24,7 +24,7 @@ _DEBUG = 10
 _INFO = 20
 _WARNING = 30
 _ERROR = 40
-logLevel = _DEBUG
+logLevel = _INFO
 
 function Trace( _text , _weight )
     _weight = _weight or _DEBUG
