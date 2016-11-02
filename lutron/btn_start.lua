@@ -21,7 +21,7 @@ _DEBUG = 10
 _INFO = 20
 _WARNING = 30
 _ERROR = 40
-logLevel = _DEBUG 
+logLevel = _INFO
 
 function Trace( _text , _weight )
     _weight = _weight or _DEBUG
@@ -66,8 +66,42 @@ fibaro:call( selfID , "setProperty" , "ui.err.value" , '' )
 --fibaro:call( selfID , "setProperty" , "ui.lastcmd.value" , '' )
 
 function lutron_data_handler(_data)
+    Trace('_data: ' .. _data)
     fibaro:call( selfID , "setProperty" , "ui.status.value" , 'receiving data' )
-    Trace('TODO: lutron_data_handler ' .. tostring(_data), _WARNING)
+    local last_cmd
+    local meta = fibaro:getGlobal(G_VAR_NAME_META)
+    Trace('meta: ' .. tostring(meta) .. ',type: ' .. type(meta))
+    if meta == nil or meta == '' then
+        -- first initial
+    	Trace('meta initial')
+        meta = {}
+    else
+    	meta = json.decode(meta)
+    end
+    for entry in string.gmatch(_data .. '\r\n','~(.-)%\r%\n') do
+        Trace('match cmd: ' .. entry)
+        local devType = string.match(entry,'(.-),')
+        local devID, pre_state, logType = _DEBUG
+        Trace('devType ' .. devType)
+        if devType == 'DEVICE' or devType == 'OUTPUT' then
+            devID = string.match(entry,',(%d+,%d+),')
+            pre_state = meta[devID]
+            meta[devID] = entry
+            if pre_state ~= entry then
+                logType = _INFO
+            end
+            Trace('devID ' .. devID .. ', pre_state ' .. pre_state .. ', new_state ' .. entry, logType)
+        else
+            Trace('unknow devType ' .. devType, _WARNING)
+        end
+        last_cmd = entry
+    end
+    fibaro:setGlobal(G_VAR_NAME_META,json.encode(meta))
+    --fibaro:call( selfID , "setProperty" , "ui.lastcmd.value" , tostring(last_cmd) )
+    fibaro:log(tostring(last_cmd))
+    meta = fibaro:getGlobal(G_VAR_NAME_META)
+    Trace('updated meta: ' .. meta, _INFO)
+    
 end
 
 function cmd_handler(_cmd)
@@ -79,6 +113,7 @@ function service_run()
 
     fibaro:setGlobal(G_VAR_NAME_STATE, 'BUSY')
     fibaro:call( selfID , "setProperty" , "ui.status.value" , 'Starting' )
+    Trace('daemon start', _INFO)
 
     local socket
     local status , err = pcall(
@@ -110,7 +145,7 @@ function service_run()
                 Trace( 'socket read result code ' .. tostring(errCode) .. ' data: ' .. tostring(rdata) )
                 if string.find(rdata,'>') > 1 then
                     fibaro:call( selfID , "setProperty" , "ui.status.value" , 'logon', _INFO )
-                    Trace('login success')
+                    Trace('login success', _INFO)
                     local count = 0
                     local MAX_COUNT = 4
                     local stopflag = fibaro:getGlobal(G_VAR_NAME_STOP)
@@ -118,6 +153,9 @@ function service_run()
                         fibaro:call( selfID , "setProperty" , "ui.status.value" , 'listening' )
                         rdata, errCode = socket:read()
                         Trace( 'socket read result code ' .. tostring(errCode) .. ' data: ' .. tostring(rdata) )
+                        if rdata ~= '' then
+                            Trace('receive data: ' .. rdata, _INFO)
+                        end
                         SCK_READ_TIMEOUT_ERR_CODE = 1
                         if rdata ~= '' and errCode ~= SCK_READ_TIMEOUT_ERR_CODE then
                             lutron_data_handler(rdata)
