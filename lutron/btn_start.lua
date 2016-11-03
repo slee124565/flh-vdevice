@@ -49,6 +49,7 @@ Trace('Socket Server IP: ' .. ipAddress .. ' listen port: ' .. tcpPort)
 Trace('check daemon state ' .. fibaro:getGlobal(G_VAR_NAME_STATE))
 if (fibaro:getGlobal(G_VAR_NAME_STATE) == 'BUSY') then
     fibaro:call( selfID , "setProperty" , "ui.err.value" , 'State Busy' )
+    Trace('lutron daemon exit')
     return
 end
 
@@ -68,7 +69,9 @@ fibaro:call( selfID , "setProperty" , "ui.err.value" , '' )
 
 function lutron_data_handler(_data)
     Trace('_data: ' .. _data)
-    fibaro:call( selfID , "setProperty" , "ui.status.value" , 'receiving data' )
+    if _data ~= 'QNET> ' then
+        fibaro:call( selfID , "setProperty" , "ui.status.value" , 'receiving data' )
+    end
     local last_data
     local meta = fibaro:getGlobal(G_VAR_NAME_META)
     Trace('meta: ' .. tostring(meta) .. ',type: ' .. type(meta))
@@ -130,6 +133,7 @@ function service_run()
         local bytes, errCode, rdata
         rdata, errCode = socket:read()
         Trace( 'socket read result code ' .. tostring(errCode) .. ' data: ' .. tostring(rdata) )
+        -- login process start
         if string.find(rdata,'login') == 1 then
             Trace('enter account ...')
             bytes, errCode = socket:write(ACCOUNT .. '\r\n')
@@ -143,36 +147,55 @@ function service_run()
                 rdata, errCode = socket:read()
                 Trace( 'socket read result code ' .. tostring(errCode) .. ' data: ' .. tostring(rdata) )
                 if string.find(rdata,'>') > 1 then
+                    -- login process finish
                     fibaro:call( selfID , "setProperty" , "ui.status.value" , 'logon', _INFO )
                     Trace('login success', _INFO)
                     local count = 0
                     local MAX_COUNT = 4
                     local stopflag = fibaro:getGlobal(G_VAR_NAME_STOP)
                     while ( tostring(stopflag) ~= 'true' ) do
+                        
+                        -- sck conn check process: make lutron must response data
+                        bytes, errCode = socket:write('\r\n')
+                        Trace( 'socket write result code ' .. tostring(errCode) .. ' bytes: ' .. tostring(bytes) )
+                        
+                        -- listening process
                         fibaro:call( selfID , "setProperty" , "ui.status.value" , 'listening' )
                         rdata, errCode = socket:read()
                         Trace( 'socket read result code ' .. tostring(errCode) .. ' data: ' .. tostring(rdata) )
                         if rdata ~= '' then
-                            Trace('receive data: ' .. rdata, _INFO)
-                        end
-                        SCK_READ_TIMEOUT_ERR_CODE = 1
-                        if rdata ~= '' and errCode ~= SCK_READ_TIMEOUT_ERR_CODE then
-                            lutron_data_handler(rdata)
-                        else
-                            cmd = fibaro:getGlobal(G_VAR_NAME_CMD)
-                            Trace('check cmd queue: ' .. tostring(cmd))
-                            if cmd ~= '' and cmd ~= nil then
-                                fibaro:call( selfID , "setProperty" , "ui.status.value" , 'execute cmd' )
-                                fibaro:setGlobal(G_VAR_NAME_CMD, '')
-                                Trace('clear cmd queue and handle cmd')
-                                Trace('process cmd: ' .. cmd, _INFO)
-                                bytes, errCode = socket:write(cmd .. '\r\n')
-                                Trace( 'socket write result code ' .. tostring(errCode) .. ' bytes: ' .. tostring(bytes) )
-                                fibaro:call( selfID , "setProperty" , "ui.lastcmd.value" , cmd )
-                            else
-                                fibaro:sleep(500)
+                            if rdata ~= 'QNET> ' then
+                                Trace('receive data: ' .. rdata, _INFO)
                             end
                         end
+                        
+                        if errCode ~= 0 then
+                            -- socket connection broken event, break loop; let watchdog restart daemon
+                            Trace('connection broken', _WARNING)
+                            break
+                        end
+                        
+                        -- read data processing
+                        if rdata ~= '' then
+                            lutron_data_handler(rdata)
+                        end
+                        
+                        -- cmd handling
+                        cmd = fibaro:getGlobal(G_VAR_NAME_CMD)
+                        Trace('check cmd queue: ' .. tostring(cmd))
+                        if cmd ~= '' and cmd ~= nil then
+                            fibaro:call( selfID , "setProperty" , "ui.status.value" , 'execute cmd' )
+                            fibaro:setGlobal(G_VAR_NAME_CMD, '')
+                            Trace('clear cmd queue and handle cmd')
+                            Trace('process cmd: ' .. cmd, _INFO)
+                            bytes, errCode = socket:write(cmd .. '\r\n')
+                            Trace( 'socket write result code ' .. tostring(errCode) .. ' bytes: ' .. tostring(bytes) )
+                            fibaro:call( selfID , "setProperty" , "ui.lastcmd.value" , cmd )
+                        else
+                            fibaro:sleep(500)
+                        end
+                        
+                        -- check daemon stop flag
                         stopflag = fibaro:getGlobal(G_VAR_NAME_STOP)
                         Trace('check stop flag ' .. tostring(stopflag))
                     end
