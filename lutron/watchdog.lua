@@ -6,10 +6,11 @@
 --]]
 
 -- config variables
-sceneID = 15
-eventExpiredSec = 10
-watchDaemonID = 398
-watchDaemonStartBtnId = 2
+sceneID = 15                -- this scene ID 
+eventExpiredSec = 10        -- the duration for daemon state not BUSY to timeout
+watchDaemonID = 398         -- daemon device ID
+watchDaemonStartBtnId = 2   -- start button ID in daemon device
+watchDaemonResetBtnId = 8   -- reset button ID in daemon device
 
 -- global variable in used
 G_VAR_NAME_WATCH = 'gLu_D_State'
@@ -37,8 +38,10 @@ function Trace( _text , _weight )
     end
 end
 
-function startDaemon()
-    Trace('start daemon by fibaro API', _INFO)
+function resetAndStartDaemon()
+    Trace('reset and start daemon by fibaro API', _INFO)
+    fibaro:call( watchDaemonID , "pressButton" , watchDaemonResetBtnId )
+    fibaro:sleep(500)
     fibaro:call( watchDaemonID , "pressButton" , watchDaemonStartBtnId )
 end
 
@@ -61,6 +64,9 @@ local now
 
 Trace('watchdog enter, time: ' .. tostring(os.time()), _INFO)
 
+Trace('restart daemon', _INFO)
+resetAndStartDaemon()
+
 -- check scene count and stopFlag
 while ((sceneCount <= MAX_COUNT) and (tostring(stopFlag) ~= 'true')) do
     
@@ -78,7 +84,7 @@ while ((sceneCount <= MAX_COUNT) and (tostring(stopFlag) ~= 'true')) do
             now = os.time()
             if (now - eventTime) > eventExpiredSec then
                 Trace('watch event expired', _INFO)
-                startDaemon()
+                resetAndStartDaemon()
                 -- reset watch event time
                 fibaro:setGlobal(G_VAR_NAME_EVENT_TIME,'')
             else
