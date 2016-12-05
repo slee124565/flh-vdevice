@@ -1,4 +1,5 @@
 --[[
+%% autostart
 %% properties
 %% events
 %% globals
@@ -78,7 +79,7 @@ while ((sceneCount <= MAX_COUNT) and (tostring(stopFlag) ~= 'true')) do
         eventTime = fibaro:getGlobal(G_VAR_NAME_EVENT_TIME)
         Trace('eventTime: ' .. tostring(eventTime))
         
-        if eventTime == '' or eventTime == nil then
+        if eventTime == '' or eventTime == nil or eventTime == 'NaN'  then
             fibaro:setGlobal(G_VAR_NAME_EVENT_TIME,tostring(os.time()))
             Trace('watch event trigger', _INFO)
         else
