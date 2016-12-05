@@ -6,23 +6,27 @@
 --]]
 
 -- config variables
-sceneID = 15                -- this scene ID 
+sceneID = 16                -- this scene ID 
 eventExpiredSec = 10        -- the duration for daemon state not BUSY to timeout
-watchDaemonID = 398         -- daemon device ID
+watchDaemonID = 447         -- daemon device ID
 watchDaemonStartBtnId = 2   -- start button ID in daemon device
 watchDaemonResetBtnId = 8   -- reset button ID in daemon device
 
 -- global variable in used
-G_VAR_NAME_WATCH = 'gLu_D_State'
-G_VAR_NAME_WD_STOP = 'gLu_WD_Stop'     -- Watch Dog Stop Flag 
-G_VAR_NAME_EVENT_TIME = 'gLu_WD_TIME'   -- Watch Event Start Time
+G_VAR_NAME_META = 'gOppo_D_Meta'
+G_VAR_NAME_STATE = 'gOppo_D_State'
+G_VAR_NAME_CMD = 'gOppo_D_Cmd'
+G_VAR_NAME_STOP = 'gOppo_D_Stop'
+G_VAR_NAME_WATCH = G_VAR_NAME_STATE
+G_VAR_NAME_WD_STOP = 'gOppo_WD_Stop'     -- Watch Dog Stop Flag 
+G_VAR_NAME_EVENT_TIME = 'gOppo_WD_TIME'   -- Watch Event Start Time
 
 -- debug function declare
 _DEBUG = 10
 _INFO = 20
 _WARNING = 30
 _ERROR = 40
-logLevel = _INFO
+logLevel = _DEBUG
 
 function Trace( _text , _weight )
     _weight = _weight or _DEBUG
@@ -75,7 +79,7 @@ while ((sceneCount <= MAX_COUNT) and (tostring(stopFlag) ~= 'true')) do
         eventTime = fibaro:getGlobal(G_VAR_NAME_EVENT_TIME)
         Trace('eventTime: ' .. tostring(eventTime))
         
-        if eventTime == '' or eventTime == nil or eventTime == 'NaN' then
+        if eventTime == '' or eventTime == nil or eventTime == 'NaN'  then
             fibaro:setGlobal(G_VAR_NAME_EVENT_TIME,tostring(os.time()))
             Trace('watch event trigger', _INFO)
         else
